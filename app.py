@@ -1,39 +1,64 @@
 import streamlit as st
+import fitz  # PyMuPDF pour lire les PDF
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 📌 1️⃣ Evaluation Savoir-Être PFE
-st.title("📝 Formulaire d'Évaluation & Diagramme Radar 📊")
-st.write("Veuillez remplir le formulaire ci-dessous. Un diagramme radar sera généré en fonction de vos réponses.")
+# 📌 1️⃣ Titre de l'application
+st.title("📋 Évaluation des Facteurs Humains")
+st.write("Téléversez un questionnaire rempli pour générer un diagramme radar.")
 
-# 📌 2️⃣ Formulaire avec 5 critères
-st.sidebar.header("📋 Répondez aux questions")
-categories = ["Communication", "Travail d'équipe", "Gestion du stress", "Adaptabilité", "Compétences techniques"]
-scores = []
+# 📌 2️⃣ Upload du fichier PDF
+uploaded_file = st.file_uploader("📂 Téléversez le fichier PDF", type=["pdf"])
 
-with st.sidebar.form("Formulaire d'évaluation"):
-    for category in categories:
-        score = st.slider(f"{category} (0-10)", min_value=0, max_value=10, value=5)
-        scores.append(score)
-    submitted = st.form_submit_button("🔍 Générer le diagramme")
+# 📌 3️⃣ Fonction pour extraire les réponses des champs du PDF
+def extract_pdf_data(pdf_bytes):
+    doc = fitz.open("pdf", pdf_bytes)  # Ouvrir le PDF depuis les données en mémoire
+    fields = {}  # Stocker les réponses
 
-# 📌 3️⃣ Génération du diagramme radar si le formulaire est soumis
-if submitted:
-    # Convertir les données en format radar
-    scores.append(scores[0])  # Boucle pour fermer le radar
-    categories.append(categories[0])
+    # 📌 Lire les champs de formulaire
+    for page in doc:
+        for widget in page.widgets():
+            if widget.field_name and widget.text:
+                fields[widget.field_name] = widget.text  # Associer champ et valeur
+
+    return fields
+
+# 📌 4️⃣ Génération du diagramme radar
+def generate_radar_chart(data):
+    labels = list(data.keys())
+    values = [int(v) for v in data.values()]
+
+    # Fermer la boucle du radar
+    values.append(values[0])
+    labels.append(labels[0])
     
-    angles = np.linspace(0, 2 * np.pi, len(categories), endpoint=True)
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=True)
 
-    # Création du diagramme radar
+    # Création du radar chart
     fig, ax = plt.subplots(figsize=(6,6), subplot_kw={'projection': 'polar'})
-    ax.fill(angles, scores, color='blue', alpha=0.3)
-    ax.plot(angles, scores, color='blue', linewidth=2)
+    ax.fill(angles, values, color='blue', alpha=0.3)
+    ax.plot(angles, values, color='blue', linewidth=2)
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(categories)
+    ax.set_xticklabels(labels)
     ax.set_yticklabels([])
-    ax.set_ylim(0, 10)
+    ax.set_ylim(0, 4)  # Car les réponses vont de 1 à 4
 
-    # Affichage du radar dans Streamlit
-    st.subheader("📊 Résultat : Diagramme Radar")
-    st.pyplot(fig)
+    return fig
+
+# 📌 5️⃣ Exécuter si un fichier est téléversé
+if uploaded_file:
+    # Extraire les réponses
+    extracted_data = extract_pdf_data(uploaded_file.read())
+
+    if extracted_data:
+        # Afficher les réponses extraites
+        st.subheader("📊 Données extraites")
+        st.write(extracted_data)
+
+        # Générer et afficher le radar chart
+        st.subheader("📌 Diagramme Radar des Compétences")
+        fig = generate_radar_chart(extracted_data)
+        st.pyplot(fig)
+    else:
+        st.error("❌ Aucune donnée trouvée dans le PDF. Assurez-vous qu'il contient des réponses.")
+
