@@ -12,16 +12,24 @@ uploaded_file = st.file_uploader("📂 Téléversez le fichier PDF", type=["pdf"
 
 # 📌 3️⃣ Fonction pour extraire les réponses des champs du PDF
 def extract_pdf_data(pdf_bytes):
-    doc = fitz.open("pdf", pdf_bytes)  # Ouvrir le PDF depuis les données en mémoire
-    fields = {}  # Stocker les réponses
+    doc = fitz.open("pdf", pdf_bytes)
+    fields = {}
 
-    # 📌 Lire les champs de formulaire
     for page in doc:
-        for widget in page.widgets():
-            if widget.field_name and widget.text:
-                fields[widget.field_name] = widget.text  # Associer champ et valeur
+        # Vérifier les champs interactifs (formulaires)
+        if page.widgets():
+            for widget in page.widgets():
+                if widget.field_name:
+                    value = widget.text if widget.text else "Non rempli"
+                    fields[widget.field_name] = value
+        
+        # Si aucun champ interactif, essayer d'extraire le texte brut
+        if not fields:
+            text = page.get_text("text")
+            fields["Texte brut extrait"] = text.strip() if text else "Aucune donnée trouvée"
 
     return fields
+
 
 # 📌 4️⃣ Génération du diagramme radar
 def generate_radar_chart(data):
